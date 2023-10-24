@@ -7,9 +7,9 @@ import torch
 import urllib.request
 
 import matplotlib.pyplot as plt
-from pyntcloud import PyntCloud
 
 logger = logging.getLogger(__name__)
+
 
 class MidasDepthEstimator():
     def __init__(self, model_type='large', device=None):
@@ -69,41 +69,30 @@ def visualize(img, depth):
     plt.imshow(depth)
     plt.show()
 
+
 def visualize_3d(img, depth_map):
     """
-    Visualize image in 3d
+    Visualize depth map
+    :param img: image
+    :param depth: depth map
     """
-    logger.info("Visualizing 3d")
-    baseline = 0.1  # Adjust this value as per your setup
+    w, h = depth_map.shape
+    d = []
+    color = []
+    d_mean = np.mean(depth_map)
+    for i in range(w):
+        for j in range(h):
+            if depth_map[i, j] < .5 * d_mean:
+                d.append([i, j, depth_map[i, j]])
+                color.append(img[i, j]/255.)
+    df = pd.DataFrame(d, columns=['x', 'y', 'z'])
 
-    # Calculate the focal length (you may need to adjust this as well)
-    focal_length = 500  # Adjust this value as per your camera calibration
-
-    # Create a grid of 3D points
-    logger.debug("Creating 3d points")
-    height, width = depth_map.shape
-    y, x = np.mgrid[0:height, 0:width]
-    x3d = (x - width / 2) * depth_map / focal_length
-    y3d = (y - height / 2) * depth_map / focal_length
-    z3d = depth_map
-
-    # Apply the baseline to the x-coordinate for stereo disparity
-    x3d += baseline
-
-    # Visualize the 3D representation
-    fig = plt.figure()
+    fig = plt.figure(figsize=(20, 10))
     ax = fig.add_subplot(111, projection='3d')
-
-    # Display the 3D points as a scatter plot
-    logger.debug("Displaying 3d points")
-    ax.scatter(x3d, -y3d, z3d, c=img)
-    ax.set_xlabel('X-axis')
-    ax.set_ylabel('Y-axis')
-    ax.set_zlabel('Z-axis')
+    ax.scatter(df['x'], df['y'], df['z'], c=color, linewidth=0.5)
+    # view from bottom
+    ax.view_init(azim=0, elev=90)
     plt.show()
-
-
-
 
 
 if __name__ == '__main__':
