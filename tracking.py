@@ -52,7 +52,7 @@ class HungarianTracker:
             for i, iou in enumerate(ious):
                 if max(iou) > 0.5:
                     track_id = iou.index(max(iou))
-                    updated_tracked_instances[track_id] = True
+                    updated_tracked_instances[i] = True
                     self.tracked_instances[i] = binary_masks[track_id]
                     new_masks_id.remove(track_id)
 

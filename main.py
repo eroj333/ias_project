@@ -121,7 +121,6 @@ def process_video(video_file, segmentation_model):
     if video_writer is not None:
         video_writer.release()
         seg_video_writer.release()
-    cv2.destroyAllWindows()
 
 
 def main(args):
