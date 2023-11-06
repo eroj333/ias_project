@@ -48,21 +48,27 @@ class HungarianTracker:
                 ious.append([compute_iou(mask, tracked_instance) for mask in binary_masks])
 
             # Assign the mask to the tracked instance with highest IoU
-            for iou in ious:
+            new_masks_id = set(range(len(binary_masks)))
+            for i, iou in enumerate(ious):
                 if max(iou) > 0.5:
                     track_id = iou.index(max(iou))
                     updated_tracked_instances[track_id] = True
-                    self.tracked_instances[track_id] = binary_masks[track_id]
-                else:
-                    track_id = self.max_id
-                    self.tracked_instances.append(binary_masks[track_id])
-                    self.tracked_ids.append(track_id)
-                    self.max_id += 1
-                    updated_tracked_instances.append(True)
+                    self.tracked_instances[i] = binary_masks[track_id]
+                    new_masks_id.remove(track_id)
+
+            # Add new instances
+            for i in new_masks_id:
+                track_id = self.max_id
+                self.tracked_instances.append(binary_masks[i])
+                self.tracked_ids.append(track_id)
+                self.max_id += 1
+                updated_tracked_instances.append(True)
 
             # Remove instances that are no longer present
-            self.tracked_instances = [self.tracked_instances[i] for i in range(len(self.tracked_instances)) if updated_tracked_instances[i]]
-            self.tracked_ids = [self.tracked_ids[i] for i in range(len(self.tracked_ids)) if updated_tracked_instances[i]]
+            self.tracked_instances = [self.tracked_instances[i] for i in range(len(self.tracked_instances)) if
+                                      updated_tracked_instances[i]]
+            self.tracked_ids = [self.tracked_ids[i] for i in range(len(self.tracked_ids)) if
+                                updated_tracked_instances[i]]
 
         return self.tag_instances(im_cp)
 
