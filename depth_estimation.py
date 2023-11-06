@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 logger = logging.getLogger(__name__)
 
 
-class MidasDepthEstimator():
-    def __init__(self, model_type='large', device=None):
+class MidasDepthEstimator:
+    def __init__(self, model_type='l', device=None):
         """
         :param model_type: model type: l, s
         :param model_path: path to saved model
@@ -70,11 +70,12 @@ def visualize(img, depth):
     plt.show()
 
 
-def visualize_3d(img, depth_map):
+def visualize_3d(img, depth_map, thres=None):
     """
     Visualize depth map
     :param img: image
     :param depth: depth map
+    :param thres: threshold for depth (0-1)
     """
     w, h = depth_map.shape
     d = []
@@ -82,16 +83,16 @@ def visualize_3d(img, depth_map):
     d_mean = np.mean(depth_map)
     for i in range(w):
         for j in range(h):
-            if depth_map[i, j] < .5 * d_mean:
+            if thres is None or depth_map[i, j] < float(thres) * d_mean:
                 d.append([i, j, depth_map[i, j]])
                 color.append(img[i, j]/255.)
     df = pd.DataFrame(d, columns=['x', 'y', 'z'])
 
     fig = plt.figure(figsize=(20, 10))
     ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(df['x'], df['y'], df['z'], c=color, linewidth=0.5)
+    ax.scatter(df['x'], df['y'], df["z"],  c=color, linewidth=0.5)
     # view from bottom
-    ax.view_init(azim=0, elev=90)
+    # ax.view_init(azim=0, elev=90)
     plt.show()
 
 
