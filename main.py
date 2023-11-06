@@ -28,7 +28,7 @@ def parse_arguments():
     """
     args = argparse.ArgumentParser(description='Panoptic Segmentation')
     args.add_argument('--image', help="path to image", default="coco_test.jpg", type=str)
-    args.add_argument('--video', help="path to video", default="demo/demo_1.mp4", type=str)
+    args.add_argument('--video', help="path to video", default="demo/demo_0.mp4", type=str)
     # args.add_argument('--model', help="path to model", default="data/model.pt", type=str)
     args.add_argument('--model_path', help="path to model", default="data/model.pt", type=str)
     args.add_argument('--method', help="path to model", default="cocopan", choices=['cv2', 'cocopan'], type=str)
