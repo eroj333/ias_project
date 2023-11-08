@@ -3,7 +3,7 @@
 This project performs panoptic segmentation using Detectron2 (FPN). The instances are tracked using Hungarian Algorithm. 
 
 Video processing pipeline:
-1. panoptic segmentation with Detectron2 
+1. panoptic segmentation with Detectron2 ([details](docs/model.md)) 
 2. Track instances using Hungarian Algorithm
 3. Draw bounding boxes and semantic segmentation masks
 4. Save output video and semantic segmentation masks
