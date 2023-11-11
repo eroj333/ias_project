@@ -216,17 +216,12 @@ if __name__ == '__main__':
     segmented_img, instances, json = dlseg.segment(img)
     # save_img(segmented_img, instances, json, "coco_test.jpg", "output")
 
-    coco_panoptic_json_path = "C:\\Users\\eshrestha\\Documents\\kitti\\semantics\\coco\\training\\annotations\\panoptic_kitti_training_2015.json"
-    coco_instances_json_path = "C:\\Users\\eshrestha\\Documents\\kitti\\semantics\\coco\\training\\panoptic_instances.json"
-    coco_dataset_path = "C:\\Users\\eshrestha\\Documents\\kitti\\semantics\\coco\\training\\panoptic_kitti_training_2015"
-    coco_train_annotations_path = "C:\\Users\\eshrestha\\Documents\\kitti\\semantics\\coco\\training\\annotations\\panoptic_kitti_training_2015"
-    coco_seg_path = "C:\\Users\\eshrestha\\Documents\\kitti\\semantics\\coco\\training\\segments"
-
-    coco_panoptic_json_path = "/mnt/c/Users/eshrestha/Documents/kitti/semantics/coco/training/annotations/panoptic_kitti_training_2015.json"
-    coco_instances_json_path = "/mnt/c/Users/eshrestha/Documents/kitti/semantics/coco/training/panoptic_instances.json"
-    coco_dataset_path = "/mnt/c/Users/eshrestha/Documents/kitti/semantics/coco/training/panoptic_kitti_training_2015"
-    coco_train_annotations_path = "/mnt/c/Users/eshrestha/Documents/kitti/semantics/coco/training/annotations/panoptic_kitti_training_2015"
-    coco_seg_path = "/mnt/c/Users/eshrestha/Documents/kitti/semantics/coco/training/segments"
+    root_path = ""
+    coco_panoptic_json_path = os.path.join(root_path,       "annotations/panoptic_kitti_training_2015.json")
+    coco_instances_json_path = os.path.join(root_path,      "panoptic_instances.json")
+    coco_dataset_path = os.path.join(root_path,             "panoptic_kitti_training_2015")
+    coco_train_annotations_path = os.path.join(root_path,   "annotations/panoptic_kitti_training_2015")
+    coco_seg_path = os.path.join(root_path,                 "segments")
 
     dlseg.train(train_json_path=coco_panoptic_json_path, instances_json_path=coco_instances_json_path,
                 coco_dataset_train_images_path=coco_dataset_path,
