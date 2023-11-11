@@ -14,3 +14,5 @@ shapely~=2.0.2
 pandas~=2.1.1
 imageio~=2.31.6
 cython~=3.0.4
+panopticapi~=0.1
+scikit-image~=0.22.0
