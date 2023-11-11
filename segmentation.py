@@ -1,16 +1,16 @@
-import logging
-import os
-
-import cv2
-import numpy as np
-from detectron2.utils.logger import setup_logger
-
-setup_logger()
 from detectron2 import model_zoo
 from detectron2.engine import DefaultPredictor, DefaultTrainer
 from detectron2.config import get_cfg
 from detectron2.data.datasets import register_coco_panoptic_separated
 from detectron2.data import DatasetCatalog
+from detectron2.utils.logger import setup_logger
+
+import logging
+import os
+import cv2
+import numpy as np
+
+setup_logger()
 
 
 def get_bbox(mask):
@@ -227,7 +227,6 @@ if __name__ == '__main__':
     coco_dataset_path = "/mnt/c/Users/eshrestha/Documents/kitti/semantics/coco/training/panoptic_kitti_training_2015"
     coco_train_annotations_path = "/mnt/c/Users/eshrestha/Documents/kitti/semantics/coco/training/annotations/panoptic_kitti_training_2015"
     coco_seg_path = "/mnt/c/Users/eshrestha/Documents/kitti/semantics/coco/training/segments"
-
 
     dlseg.train(train_json_path=coco_panoptic_json_path, instances_json_path=coco_instances_json_path,
                 coco_dataset_train_images_path=coco_dataset_path,
