@@ -1,12 +1,24 @@
 import json
 import logging
 import os
-
+from skimage import measure
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 import imageio.v2 as io
 from tqdm import tqdm
+from pycocotools import mask as coco_mask
+
+
+class CustomJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (np.int64, np.uint32)):
+            return obj.item()
+        elif isinstance(obj, bytes):
+            return str(obj, encoding='utf-8')
+        else:
+            return super().default(obj)
+
 
 CITYSCAPES_LABELS_MAP = {
     'unlabeled': 0,
@@ -55,6 +67,43 @@ CITYSCAPES_IDX_TO_KITTI_IDX = [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2
 
 def get_file_list(src_dir):
     return [f for f in os.listdir(src_dir) if os.path.isfile(os.path.join(src_dir, f))]
+
+
+def create_panoptic_segment(mask, instance_id, cityscapes_category_id, im_id):
+    mask_x, mask_y = np.where(mask == 255)
+    if len(mask_x) == 0:
+        return None
+    x_min = int(np.min(mask_x))
+    y_min = int(np.min(mask_y))
+
+    x_max = int(np.max(mask_x))
+    y_max = int(np.max(mask_y))
+
+    x, y, w, h = x_min, y_min, x_max - x_min, y_max - y_min
+
+    if w == 0 or h == 0:
+        return None
+
+    category_id = CITYSCAPES_IDX_TO_KITTI_IDX[cityscapes_category_id]
+    # print(category_id, CITYSCAPES_IDX_TO_TEXT[cityscapes_category_id], self.cat_from_idx[category_id])
+
+    segment_info = {"id": int(instance_id),
+                    "category_id": int(category_id),
+                    "area": w * h,
+                    "iscrowd": 0,
+                    "bbox": [x, y, w, h],
+                    "image_id": int(im_id)}
+    return segment_info
+
+
+def instance_segment_contours(mask_bin):
+    fortran_ground_truth_binary_mask = np.asfortranarray(mask_bin)
+    encoded_ground_truth = coco_mask.encode(fortran_ground_truth_binary_mask)
+    area = coco_mask.area(encoded_ground_truth)
+    bbox = coco_mask.toBbox(encoded_ground_truth)
+    contours = measure.find_contours(mask_bin, 0.5)
+
+    return [np.flip(contour, axis=1).ravel().tolist() for contour in contours]
 
 
 class KittiToCocoPanopticConverter:
@@ -115,7 +164,8 @@ class KittiToCocoPanopticConverter:
 
         licenses = {}
 
-        annotations = []
+        panoptic_annotations = []
+        instance_annotations = []
         images = []
         categories = []
 
@@ -148,6 +198,7 @@ class KittiToCocoPanopticConverter:
             images.append(image_info)
 
             gt_seg_img = np.zeros_like(gt_img)
+            gt_seg_gray = np.zeros((image_height, image_width))
 
             segments_info = []
 
@@ -176,32 +227,6 @@ class KittiToCocoPanopticConverter:
             if 0 in num_instances:
                 num_instances = num_instances[1:]
 
-            def create_segment(mask, instance_id, cityscapes_category_id, im_id):
-                mask_x, mask_y = np.where(mask == 255)
-                if len(mask_x) == 0:
-                    return None
-                x_min = int(np.min(mask_x))
-                y_min = int(np.min(mask_y))
-
-                x_max = int(np.max(mask_x))
-                y_max = int(np.max(mask_y))
-
-                x, y, w, h = x_min, y_min, x_max - x_min, y_max - y_min
-
-                if w == 0 or h == 0:
-                    return None
-
-                category_id = CITYSCAPES_IDX_TO_KITTI_IDX[cityscapes_category_id]
-                # print(category_id, CITYSCAPES_IDX_TO_TEXT[cityscapes_category_id], self.cat_from_idx[category_id])
-
-                segment_info = {"id": int(instance_id),
-                                "category_id": int(category_id),
-                                "area": w * h,
-                                "iscrowd": 0,
-                                "bbox": [x, y, w, h],
-                                "image_id": int(im_id)}
-                return segment_info
-
             new_instance_img = np.zeros(instance_img.shape)
             for instance_id in num_instances:
                 # print(instance_id, type(instance_img))
@@ -215,43 +240,72 @@ class KittiToCocoPanopticConverter:
                 for c in unique_classes:
                     if c != 0:
                         mask = np.where(lbl_combined == c, 255, 0)
+                        mask_bin = np.where(mask == 255, 1, 0)
+
                         # print(mask.shape, np.sum(mask))
                         new_instance_img[mask == 255] = current_instance_id
-                        segment_info = create_segment(mask, current_instance_id, c, image_id)
+                        segment_info = create_panoptic_segment(mask, current_instance_id, c, image_id)
 
-                        cat_color = self.category_color_map[self.cat_from_idx[CITYSCAPES_IDX_TO_KITTI_IDX[c]]]
+                        cat_id = CITYSCAPES_IDX_TO_KITTI_IDX[c]
+                        gt_seg_gray[mask == 255] = cat_id
+                        cat_color = self.category_color_map[self.cat_from_idx[cat_id]]
                         gt_seg_img[mask == 255] = cat_color
 
-                        if segment_info is not None:
-                            segments_info.append(segment_info)
+                        if segment_info is None:
+                            continue
+                        segments_info.append(segment_info)
                         # print(segment_info)
                         current_instance_id += 1
 
-            annotation = {"id": len(annotations) + 1, "image_id": image_id, "file_name": jpg_img,
+                        instance_ann = {"id": len(instance_annotations) + 1,
+                                        "image_id": image_id,
+                                        "category_id": int(cat_id),
+                                        "area": segment_info["area"],
+                                        "iscrowd": 0,
+                                        "bbox": segment_info["bbox"],
+                                        "segmentation": instance_segment_contours(mask_bin.astype(np.uint8)),
+                                        # coco_mask.encode(np.asfortranarray(mask_bin)),
+                                        "file_name": jpg_img,
+                                        }
+                        instance_annotations.append(instance_ann)
+
+            annotation = {"id": len(panoptic_annotations) + 1, "image_id": image_id, "file_name": jpg_img,
                           "segments_info": segments_info}
 
-            annotations.append(annotation)
+            panoptic_annotations.append(annotation)
 
             # write instance and label image
-            instance_dest_path = os.path.join(self.output_dir, dataset_name, "annotations", annotation_name, jpg_img)
+            instance_dest_path = os.path.join(self.output_dir, dataset_name, "annotations", annotation_name, image)
             os.makedirs(os.path.dirname(instance_dest_path), exist_ok=True)
-            cv2.imwrite(instance_dest_path, new_instance_img)
+            cv2.imwrite(instance_dest_path, np.uint64(new_instance_img))
 
             img_dest_path = os.path.join(self.output_dir, dataset_name, annotation_name, jpg_img)
             os.makedirs(os.path.dirname(img_dest_path), exist_ok=True)
-            cv2.imwrite(img_dest_path, gt_img)
+            cv2.imwrite(img_dest_path, np.uint64(gt_img))
 
-            seg_dest_path = os.path.join(self.output_dir, dataset_name, "segments", jpg_img)
+            seg_rgb_dest_path = os.path.join(self.output_dir, dataset_name, "segments_rgb", image)
+            os.makedirs(os.path.dirname(seg_rgb_dest_path), exist_ok=True)
+            cv2.imwrite(seg_rgb_dest_path, np.uint64(gt_seg_img))
+
+            seg_dest_path = os.path.join(self.output_dir, dataset_name, "segments", image)
             os.makedirs(os.path.dirname(seg_dest_path), exist_ok=True)
-            cv2.imwrite(seg_dest_path, gt_seg_img)
+            cv2.imwrite(seg_dest_path, np.uint64(gt_seg_gray))
 
-        coco_panoptic_json = {"info": info, "licenses": licenses, "annotations": annotations, "images": images,
+        coco_panoptic_json = {"info": info, "licenses": licenses, "annotations": panoptic_annotations, "images": images,
+                              "categories": categories}
+
+        coco_instance_json = {"info": info, "licenses": licenses, "annotations": instance_annotations, "images": images,
                               "categories": categories}
 
         json_dest_path = os.path.join(self.output_dir, dataset_name, "annotations", f"{annotation_name}.json")
         os.makedirs(os.path.dirname(json_dest_path), exist_ok=True)
         with open(json_dest_path, "w") as f:
             json.dump(coco_panoptic_json, f)
+
+        instance_json_dest_path = os.path.join(self.output_dir, dataset_name, f"panoptic_instances.json")
+        os.makedirs(os.path.dirname(instance_json_dest_path), exist_ok=True)
+        with open(instance_json_dest_path, "w") as f:
+            json.dump(coco_instance_json, f, cls=CustomJSONEncoder)
 
 
 if __name__ == '__main__':
