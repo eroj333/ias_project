@@ -22,10 +22,34 @@ Video processing pipeline for each frame of video:
 
 ## Installation
 
+[Numpy in windows has some data type issues. Please use WSL if on windows.](https://github.com/numpy/numpy/issues/17640)
+
+
+
+Create conda env
+```commandline
+conda create -n panoptic python=3.10.13
+```
+Activate env
+```commandline
+conda activate panoptic
+```
+Install PyTorch following the instructions [here](https://pytorch.org/get-started/locally/)
+
 Install Detectron2 following the instructions [here](https://detectron2.readthedocs.io/en/latest/tutorials/install.html)
 or
 ```commandline
 python -m pip install 'git+https://github.com/facebookresearch/detectron2.git'
+```
+
+Install panopticapi
+```commandline
+pip install git+https://github.com/cocodataset/panopticapi.git
+```
+
+Install openCV
+```commandline
+pip install opencv-python
 ```
 
 Install the dependencies
