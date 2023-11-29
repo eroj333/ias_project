@@ -1,24 +1,12 @@
 import json
 import logging
 import os
-from skimage import measure
 import cv2
 import numpy as np
-from matplotlib import pyplot as plt
 import imageio.v2 as io
 from tqdm import tqdm
-from pycocotools import mask as coco_mask
 
-
-class CustomJSONEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, (np.int64, np.uint32)):
-            return obj.item()
-        elif isinstance(obj, bytes):
-            return str(obj, encoding='utf-8')
-        else:
-            return super().default(obj)
-
+from utils import CustomJSONEncoder, instance_segment_contours
 
 CITYSCAPES_LABELS_MAP = {
     'unlabeled': 0,
@@ -94,16 +82,6 @@ def create_panoptic_segment(mask, instance_id, cityscapes_category_id, im_id):
                     "bbox": [x, y, w, h],
                     "image_id": int(im_id)}
     return segment_info
-
-
-def instance_segment_contours(mask_bin):
-    fortran_ground_truth_binary_mask = np.asfortranarray(mask_bin)
-    encoded_ground_truth = coco_mask.encode(fortran_ground_truth_binary_mask)
-    area = coco_mask.area(encoded_ground_truth)
-    bbox = coco_mask.toBbox(encoded_ground_truth)
-    contours = measure.find_contours(mask_bin, 0.5)
-
-    return [np.flip(contour, axis=1).ravel().tolist() for contour in contours]
 
 
 class KittiToCocoPanopticConverter:
@@ -306,6 +284,12 @@ class KittiToCocoPanopticConverter:
         os.makedirs(os.path.dirname(instance_json_dest_path), exist_ok=True)
         with open(instance_json_dest_path, "w") as f:
             json.dump(coco_instance_json, f, cls=CustomJSONEncoder)
+
+
+
+
+
+
 
 
 if __name__ == '__main__':

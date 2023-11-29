@@ -52,6 +52,11 @@ Install openCV
 pip install opencv-python
 ```
 
+Install nuscenes-devkit
+```commandline
+pip install nuscenes-devkit
+```   
+
 Install the dependencies
 ```commandline
 pip install -r requirements.txt

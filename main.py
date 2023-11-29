@@ -28,10 +28,10 @@ def parse_arguments():
     """
     args = argparse.ArgumentParser(description='Panoptic Segmentation')
     args.add_argument('--image', help="path to image", default="coco_test.jpg", type=str)
-    args.add_argument('--video', help="path to video", default="demo/demo_0.mp4", type=str)
+    args.add_argument('--video', help="path to video", default="demo/demo_2.mp4", type=str)
     # args.add_argument('--model', help="path to model", default="data/model.pt", type=str)
-    args.add_argument('--model_path', help="path to model", default="data/model.pt", type=str)
-    args.add_argument('--method', help="path to model", default="cocopan", choices=['cv2', 'cocopan'], type=str)
+    args.add_argument('--model_path', help="path to model", default="output_nuimages", type=str)
+    args.add_argument('--method', help="path to model", default="cocopan", choices=['default', 'kitti', 'cocopan'], type=str)
     args.add_argument('--output', help="path to output", default="output", type=str)
     return args.parse_args()
 
@@ -42,10 +42,12 @@ def resolve_model(args):
     :param model: path to model or name of model
     :return: model
     """
-    if args.method == "cv2":
-        return ThresholdSegmentation()
-    elif args.method == "cocopan":
+    if args.method == "default":
         return CocoPanopticSegmentation()
+    elif args.method == "kitti":
+        return CocoPanopticSegmentation(args.model_path, num_classes=8)
+    elif args.method == "cocopan":
+        return CocoPanopticSegmentation(args.model_path, num_classes=6)
     else:
         return None
 

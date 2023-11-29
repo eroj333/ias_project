@@ -1,11 +1,20 @@
 import json
 import os
+import random
 import sys
 import cv2
+import numpy as np
 
 import torch
 
 import logging
+
+from detectron2.data import DatasetCatalog, MetadataCatalog
+from detectron2.data.datasets import register_coco_panoptic_separated
+from detectron2.utils.visualizer import Visualizer
+
+from pycocotools import mask as coco_mask
+from skimage import measure
 
 logger = logging.getLogger(__name__)
 
@@ -74,3 +83,49 @@ def save_img(img, mask, json_dict, depth_map, original_img_path, path):
     # with open(json_path, 'w') as f:
     #     json.dump(str(json_dict), f)
     # logger.info("Saved segmentation details")
+
+
+class CustomJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (np.int64, np.uint32)):
+            return obj.item()
+        elif isinstance(obj, bytes):
+            return str(obj, encoding='utf-8')
+        else:
+            return super().default(obj)
+
+
+def instance_segment_contours(mask_bin):
+    fortran_ground_truth_binary_mask = np.asfortranarray(mask_bin)
+    encoded_ground_truth = coco_mask.encode(fortran_ground_truth_binary_mask)
+    area = coco_mask.area(encoded_ground_truth)
+    bbox = coco_mask.toBbox(encoded_ground_truth)
+    contours = measure.find_contours(mask_bin, 0.5)
+
+    return area.tolist(), bbox.tolist(), [np.flip(contour, axis=1).ravel().tolist() for contour in contours]
+
+
+def visualize_dataset_samples(dataset_name):
+    """
+    Visualize samples from dataset
+    :param dataset_name: name of dataset
+    """
+    dataset_dicts = DatasetCatalog.get(dataset_name)
+    for d in random.sample(dataset_dicts, 3):
+        img = cv2.imread(d["file_name"])
+        visualizer = Visualizer(img[:, :, ::-1], metadata=MetadataCatalog.get(dataset_name), scale=0.5)
+        vis = visualizer.draw_dataset_dict(d)
+        cv2.imshow("", vis.get_image()[:, :, ::-1])
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+
+def register_dataset(dataset_name, metadata, image_root, panoptic_root, panoptic_json, sem_seg_root,
+                     instances_json):
+    register_coco_panoptic_separated(name=dataset_name,
+                                     metadata=metadata,
+                                     image_root=image_root,
+                                     panoptic_root=panoptic_root,
+                                     panoptic_json=panoptic_json,
+                                     sem_seg_root=sem_seg_root,
+                                     instances_json=instances_json)

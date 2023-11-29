@@ -55,8 +55,9 @@ def get_segmented_img(img, masks, seg_info=None):
               [191, 162, 208]]
     segmented_img = np.zeros(img.shape)
     for i in range(len(masks)):
+        color_idx = i if seg_info is None else seg_info[i]["category_id"]
         mask = masks[i]
-        color = colors[i % len(colors)]
+        color = colors[color_idx % len(colors)]
         segmented_img[mask == 255] = color
     return segmented_img
 
@@ -126,19 +127,28 @@ class ThresholdSegmentation():
 
 
 class CocoPanopticSegmentation:
-    def __init__(self, model_save_path=None):
+    def __init__(self, model_save_path=None, num_classes=8):
         self.cfg = get_cfg()
         self.cfg.merge_from_file(model_zoo.get_config_file("COCO-PanopticSegmentation/panoptic_fpn_R_101_3x.yaml"))
-        self.cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-PanopticSegmentation/panoptic_fpn_R_101_3x.yaml")
+        self.cfg.MODEL.ROI_HEADS.NUM_CLASSES = num_classes
+        if model_save_path is None:
+            self.cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(
+                "COCO-PanopticSegmentation/panoptic_fpn_R_101_3x.yaml")
+        else:
+            # self.cfg.merge_from_file(model_save_path)
+            self.cfg.MODEL.WEIGHTS = os.path.join(model_save_path, "model_final.pth")
+
         self.cfg.OUTPUT_DIR = os.path.join("output",
                                            self.__class__.__name__) if model_save_path is None else model_save_path
         self.cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5
         self.cfg.MODEL.PANOPTIC_FPN.COMBINE.INSTANCES_CONFIDENCE_THRESH = 0.5
         self.predictor = DefaultPredictor(self.cfg)
         self.logger = logging.getLogger(self.__class__.__name__)
+        self.num_classes = num_classes
 
     def train(self, coco_dataset_train_images_path, coco_dataset_val_path,
-              train_json_path, instances_json_path, coco_train_annotations_path, coco_train_segment_path):
+              train_json_path, instances_json_path, coco_train_annotations_path,
+              coco_train_segment_path, save_path=None):
         """
         Train the model
         """
@@ -150,7 +160,9 @@ class CocoPanopticSegmentation:
             "stuff_dataset_id_to_contiguous_id": {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7}
         }
         register_coco_panoptic_separated(name=train_datset,
-                                         metadata={},
+                                         metadata={
+                                             'stuff_classes': ['flat'],
+                                         },
                                          image_root=coco_dataset_train_images_path,
                                          panoptic_root=coco_train_annotations_path,
                                          panoptic_json=train_json_path,
@@ -165,9 +177,11 @@ class CocoPanopticSegmentation:
         self.cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-PanopticSegmentation/panoptic_fpn_R_101_3x.yaml")
         self.cfg.SOLVER.IMS_PER_BATCH = 2
         self.cfg.SOLVER.BASE_LR = 0.00025
-        self.cfg.SOLVER.MAX_ITER = 5000
+        self.cfg.SOLVER.MAX_ITER = 2000
         self.cfg.MODEL.ROI_HEADS.BATCH_SIZE_PER_IMAGE = 128
-        self.cfg.MODEL.ROI_HEADS.NUM_CLASSES = 8
+        self.cfg.MODEL.ROI_HEADS.NUM_CLASSES = self.num_classes
+        if save_path is not None:
+            self.cfg.OUTPUT_DIR = save_path
 
         os.makedirs(self.cfg.OUTPUT_DIR, exist_ok=True)
 
@@ -186,6 +200,7 @@ class CocoPanopticSegmentation:
         """
         panoptic_seg, segments_info = self.predictor(img)["panoptic_seg"]
         panoptic_seg = panoptic_seg.cpu().numpy()
+        filtered_seg_info = []
 
         instances = []
         classes = []
@@ -195,6 +210,7 @@ class CocoPanopticSegmentation:
             if segments_info[i]["isthing"]:
                 instances.append(mask)
                 classes.append(segments_info[i]["category_id"])
+                filtered_seg_info.append(segments_info[i])
 
         json = {}
         for i in range(len(instances)):
@@ -206,15 +222,11 @@ class CocoPanopticSegmentation:
             json[instance_id]["area"] = get_area(mask)
             json[instance_id]["class"] = classes[i]
 
-        segmented_img = get_segmented_img(img, instances, segments_info)
+        segmented_img = get_segmented_img(img, instances, filtered_seg_info)
         return segmented_img, instances, json
 
 
 if __name__ == '__main__':
-    dlseg = CocoPanopticSegmentation()
-    img = cv2.imread("coco_test.jpg")
-    segmented_img, instances, json = dlseg.segment(img)
-    # save_img(segmented_img, instances, json, "coco_test.jpg", "output")
 
     root_path = ""
     coco_panoptic_json_path = os.path.join(root_path,       "annotations/panoptic_kitti_training_2015.json")
@@ -222,8 +234,15 @@ if __name__ == '__main__':
     coco_dataset_path = os.path.join(root_path,             "panoptic_kitti_training_2015")
     coco_train_annotations_path = os.path.join(root_path,   "annotations/panoptic_kitti_training_2015")
     coco_seg_path = os.path.join(root_path,                 "segments")
+    num_classes = 6
 
+    dlseg = CocoPanopticSegmentation(num_classes=num_classes)
+
+    # img = cv2.imread("coco_test.jpg")
+    # segmented_img, instances, json = dlseg.segment(img)
+    #
     dlseg.train(train_json_path=coco_panoptic_json_path, instances_json_path=coco_instances_json_path,
                 coco_dataset_train_images_path=coco_dataset_path,
                 coco_train_annotations_path=coco_train_annotations_path,
-                coco_dataset_val_path=coco_dataset_path, coco_train_segment_path=coco_seg_path)
+                coco_dataset_val_path=coco_dataset_path, coco_train_segment_path=coco_seg_path,
+                save_path="output_nuimages")

@@ -50,7 +50,7 @@ class HungarianTracker:
             # Assign the mask to the tracked instance with highest IoU
             new_masks_id = set(range(len(binary_masks)))
             for i, iou in enumerate(ious):
-                if max(iou) > 0.5:
+                if iou is not None and sum(iou)>0 and max(iou) > 0.5:
                     track_id = iou.index(max(iou))
                     updated_tracked_instances[i] = True
                     self.tracked_instances[i] = binary_masks[track_id]
@@ -78,6 +78,7 @@ class HungarianTracker:
         """
         for i, mask in enumerate(self.tracked_instances):
             indices = np.where(mask == 1)
+            img[indices] = [255, 255, 0]
             x1, y1 = np.min(indices[1]), np.min(indices[0])
             x2, y2 = np.max(indices[1]), np.max(indices[0])
             cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 0), 2)
